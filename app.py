@@ -7,19 +7,12 @@ import os
 st.set_page_config(page_title="익명 투표 앱 대시보드", page_icon="📊", layout="wide")
 st.title("📊 트렌드 & 투표 현황 대시보드")
 
-# 2. DB 연결 함수 (캐싱을 통해 매번 연결하는 부하 방지)
+# 2. DB 연결 함수
 @st.cache_resource
 def init_connection():
-    # Railway의 PostgreSQL 환경 변수를 그대로 사용합니다.
-    return psycopg2.connect(
-        host=os.environ.get("PGHOST", "데이터베이스_주소"),
-        database=os.environ.get("PGDATABASE", "DB이름"),
-        user=os.environ.get("PGUSER", "유저명"),
-        password=os.environ.get("PGPASSWORD", "비밀번호"),
-        port=os.environ.get("PGPORT", "5432")
-    )
+    # DATABASE_URL 하나로 모든 연결 정보를 처리합니다.
+    return psycopg2.connect(os.environ.get("DATABASE_URL"))
 
-conn = init_connection()
 
 # 3. 데이터 불러오기 함수 (10분마다 캐시 갱신)
 @st.cache_data(ttl=600)
