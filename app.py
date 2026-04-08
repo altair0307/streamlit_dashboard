@@ -9,33 +9,31 @@ st.title("📊 10대 익명 투표 라벨링 분석 대시보드")
 # 2. 데이터 불러오기 (캐싱)
 @st.cache_data
 def load_data():
-    # ★ 아래 변수에 아까 복사한 실제 GitHub Raw 주소를 꼭 넣어주세요! ★
-    # 예시: "https://raw.githubusercontent.com/아이디/저장소/main/question_labeling_refined_final.csv"
-    csv_url = "https://raw.githubusercontent.com/altair0307/streamlit_dashboard/refs/heads/main/question_labeling_refined_final.csv" 
+    # ★ 아래 변수에 "새로 올리신 파일"의 실제 GitHub Raw 주소를 넣어주세요! ★
+    # 예시: "https://raw.githubusercontent.com/.../question_labeling_auto_completed_cleaned.csv"
+    csv_url = "https://raw.githubusercontent.com/altair0307/streamlit_dashboard/refs/heads/main/question_labeling_auto_completed_cleaned.csv" 
     
     # CSV 읽어오기
     df = pd.read_csv(csv_url)
     
-    # 데이터 전처리: vote_count를 숫자로 확실하게 변환 (혹시 모를 에러 방지)
+    # 데이터 전처리: vote_count를 숫자로 확실하게 변환
     df['vote_count'] = pd.to_numeric(df['vote_count'], errors='coerce').fillna(0)
     return df
 
 try:
     df = load_data()
     
-    # 3. 핵심 지표 (Metrics)
+    # 3. 핵심 지표 (Metrics) - 수동 리뷰 제외, 3개로 깔끔하게 구성
     st.subheader("💡 핵심 요약 지표")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     total_questions = len(df)
     total_votes = df['vote_count'].sum()
-    top_category = df['refined_main_label'].mode()[0]
-    manual_review_needed = df[df['needs_manual_review'] == 1].shape[0]
+    top_category = df['refined_main_label'].mode()[0] if not df['refined_main_label'].empty else "데이터 없음"
     
     col1.metric("총 질문 데이터", f"{total_questions:,.0f} 개")
     col2.metric("총 누적 투표 수", f"{total_votes:,.0f} 회")
     col3.metric("가장 많은 카테고리", top_category)
-    col4.metric("수동 리뷰 필요건", f"{manual_review_needed} 건", "검수 대기중", delta_color="inverse")
     
     st.divider()
 
@@ -44,7 +42,7 @@ try:
     
     with left_col:
         st.subheader("🏷️ 카테고리별 질문 분포")
-        # 쓸데없는 reason 컬럼은 빼고, 메인 라벨 기준 분포 확인
+        # 메인 라벨 기준 분포 확인
         category_counts = df['refined_main_label'].value_counts().reset_index()
         category_counts.columns = ['카테고리', '질문 수']
         
@@ -81,12 +79,18 @@ try:
     else:
         filtered_df = df[df['refined_main_label'] == selected_category]
     
-    # 화면에 보여줄 때 분석에 불필요한 긴 텍스트(reason, matched_keywords 등)는 숨기고 핵심만 깔끔하게 구성
-    display_columns = ['question_id', 'question_text', 'vote_count', 'refined_main_label', 'needs_manual_review']
+    # 분석에 방해되는 긴 텍스트와 불필요한 리뷰용 컬럼들은 숨김 처리
+    display_columns = ['question_id', 'question_text', 'vote_count', 'refined_main_label']
     
-    # 깔끔한 표 형태로 출력 (인덱스 숨김 처리)
-    st.dataframe(filtered_df[display_columns].set_index('question_id'), use_container_width=True)
+    # 실제 존재하는 컬럼만 선택해서 에러 방지
+    existing_columns = [col for col in display_columns if col in filtered_df.columns]
+    
+    # 깔끔한 표 형태로 출력 (인덱스를 ID로 설정하여 더 깔끔하게)
+    if 'question_id' in existing_columns:
+        st.dataframe(filtered_df[existing_columns].set_index('question_id'), use_container_width=True)
+    else:
+        st.dataframe(filtered_df[existing_columns], use_container_width=True)
 
 except Exception as e:
-    st.error("데이터를 불러오거나 시각화하는 중 오류가 발생했습니다. 코드 내의 GitHub 주소를 확인해주세요!")
+    st.error("데이터를 불러오거나 시각화하는 중 오류가 발생했습니다. 코드 내의 GitHub Raw 주소가 정확한지 확인해주세요!")
     st.exception(e)
