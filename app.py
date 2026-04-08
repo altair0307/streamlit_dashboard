@@ -3,14 +3,13 @@ import pandas as pd
 import plotly.express as px
 
 # 1. 페이지 설정
-st.set_page_config(page_title="익명 투표 라벨링 대시보드", page_icon="📊", layout="wide")
-st.title("📊 10대 익명 투표 라벨링 분석 대시보드")
+st.set_page_config(page_title="익명 투표 대시보드", page_icon="📊", layout="wide")
+st.title("📊 10대 익명 투표 분석 대시보드")
 
 # 2. 데이터 불러오기 (캐싱)
 @st.cache_data
 def load_data():
-    # ★ 아래 변수에 "새로 올리신 파일"의 실제 GitHub Raw 주소를 넣어주세요! ★
-    # 예시: "https://raw.githubusercontent.com/.../question_labeling_auto_completed_cleaned.csv"
+    # ★ 아래 변수에 현재 사용 중인 CSV 파일의 실제 GitHub Raw 주소를 넣어주세요! ★
     csv_url = "https://raw.githubusercontent.com/altair0307/streamlit_dashboard/refs/heads/main/question_labeling_auto_completed_cleaned.csv" 
     
     # CSV 읽어오기
@@ -23,13 +22,14 @@ def load_data():
 try:
     df = load_data()
     
-    # 3. 핵심 지표 (Metrics) - 수동 리뷰 제외, 3개로 깔끔하게 구성
+    # 3. 핵심 지표 (Metrics)
     st.subheader("💡 핵심 요약 지표")
     col1, col2, col3 = st.columns(3)
     
     total_questions = len(df)
     total_votes = df['vote_count'].sum()
-    top_category = df['refined_main_label'].mode()[0] if not df['refined_main_label'].empty else "데이터 없음"
+    # 바뀐 컬럼명인 'topic_label'을 사용합니다.
+    top_category = df['topic_label'].mode()[0] if not df['topic_label'].empty else "데이터 없음"
     
     col1.metric("총 질문 데이터", f"{total_questions:,.0f} 개")
     col2.metric("총 누적 투표 수", f"{total_votes:,.0f} 회")
@@ -42,8 +42,8 @@ try:
     
     with left_col:
         st.subheader("🏷️ 카테고리별 질문 분포")
-        # 메인 라벨 기준 분포 확인
-        category_counts = df['refined_main_label'].value_counts().reset_index()
+        # 'topic_label' 기준 분포 확인
+        category_counts = df['topic_label'].value_counts().reset_index()
         category_counts.columns = ['카테고리', '질문 수']
         
         # 도넛 모양 파이 차트 생성
@@ -70,22 +70,21 @@ try:
     # 5. 데이터 탐색 (필터링 테이블)
     st.subheader("🔍 세부 데이터 탐색")
     
-    # 카테고리 선택 드롭다운 필터
-    categories = ["전체 보기"] + list(df['refined_main_label'].dropna().unique())
+    # 카테고리 선택 드롭다운 필터 ('topic_label' 사용)
+    categories = ["전체 보기"] + list(df['topic_label'].dropna().unique())
     selected_category = st.selectbox("카테고리를 선택해서 모아보기:", categories)
     
     if selected_category == "전체 보기":
         filtered_df = df
     else:
-        filtered_df = df[df['refined_main_label'] == selected_category]
+        filtered_df = df[df['topic_label'] == selected_category]
     
-    # 분석에 방해되는 긴 텍스트와 불필요한 리뷰용 컬럼들은 숨김 처리
-    display_columns = ['question_id', 'question_text', 'vote_count', 'refined_main_label']
+    # 표에 보여줄 컬럼 지정 ('topic_reason' 등 불필요한 긴 텍스트 제외)
+    display_columns = ['question_id', 'question_text', 'vote_count', 'topic_label']
     
-    # 실제 존재하는 컬럼만 선택해서 에러 방지
+    # 깔끔한 표 형태로 출력 (question_id를 인덱스로 설정)
     existing_columns = [col for col in display_columns if col in filtered_df.columns]
     
-    # 깔끔한 표 형태로 출력 (인덱스를 ID로 설정하여 더 깔끔하게)
     if 'question_id' in existing_columns:
         st.dataframe(filtered_df[existing_columns].set_index('question_id'), use_container_width=True)
     else:
