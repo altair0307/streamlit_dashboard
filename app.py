@@ -9,8 +9,8 @@ st.title("📊 10대 익명 투표 분석 대시보드")
 # 2. 데이터 불러오기 (캐싱)
 @st.cache_data
 def load_data():
-    # ★ 아래 변수에 현재 사용 중인 CSV 파일의 실제 GitHub Raw 주소를 넣어주세요! ★
-    csv_url = "https://raw.githubusercontent.com/altair0307/streamlit_dashboard/refs/heads/main/question_labeling_auto_completed_cleaned.csv" 
+    # ★ 아래 변수에 가장 최신 CSV 파일의 실제 GitHub Raw 주소를 넣어주세요! ★
+    csv_url = "https://raw.githubusercontent.com/altair0307/streamlit_dashboard/refs/heads/main/question_labeling_refined_final.csv" 
     
     # CSV 읽어오기
     df = pd.read_csv(csv_url)
@@ -22,14 +22,15 @@ def load_data():
 try:
     df = load_data()
     
-    # 3. 핵심 지표 (Metrics)
+    # 3. 핵심 지표 (Metrics) - 깔끔하게 3개만 배치
     st.subheader("💡 핵심 요약 지표")
     col1, col2, col3 = st.columns(3)
     
     total_questions = len(df)
     total_votes = df['vote_count'].sum()
-    # 바뀐 컬럼명인 'topic_label'을 사용합니다.
-    top_category = df['topic_label'].mode()[0] if not df['topic_label'].empty else "데이터 없음"
+    
+    # 이번 데이터의 핵심 카테고리 컬럼인 'main_label'을 사용합니다.
+    top_category = df['main_label'].mode()[0] if not df['main_label'].empty else "데이터 없음"
     
     col1.metric("총 질문 데이터", f"{total_questions:,.0f} 개")
     col2.metric("총 누적 투표 수", f"{total_votes:,.0f} 회")
@@ -42,8 +43,8 @@ try:
     
     with left_col:
         st.subheader("🏷️ 카테고리별 질문 분포")
-        # 'topic_label' 기준 분포 확인
-        category_counts = df['topic_label'].value_counts().reset_index()
+        # 'main_label' 기준 분포 확인
+        category_counts = df['main_label'].value_counts().reset_index()
         category_counts.columns = ['카테고리', '질문 수']
         
         # 도넛 모양 파이 차트 생성
@@ -70,19 +71,19 @@ try:
     # 5. 데이터 탐색 (필터링 테이블)
     st.subheader("🔍 세부 데이터 탐색")
     
-    # 카테고리 선택 드롭다운 필터 ('topic_label' 사용)
-    categories = ["전체 보기"] + list(df['topic_label'].dropna().unique())
+    # 카테고리 선택 드롭다운 필터 ('main_label' 사용)
+    categories = ["전체 보기"] + list(df['main_label'].dropna().unique())
     selected_category = st.selectbox("카테고리를 선택해서 모아보기:", categories)
     
     if selected_category == "전체 보기":
         filtered_df = df
     else:
-        filtered_df = df[df['topic_label'] == selected_category]
+        filtered_df = df[df['main_label'] == selected_category]
     
-    # 표에 보여줄 컬럼 지정 ('topic_reason' 등 불필요한 긴 텍스트 제외)
-    display_columns = ['question_id', 'question_text', 'vote_count', 'topic_label']
+    # 표에 보여줄 핵심 컬럼만 지정 (manual_review_... 등 불필요한 열 숨김)
+    display_columns = ['question_id', 'question_text', 'vote_count', 'main_label']
     
-    # 깔끔한 표 형태로 출력 (question_id를 인덱스로 설정)
+    # 실제 존재하는 컬럼만 필터링하여 출력 (에러 방지용)
     existing_columns = [col for col in display_columns if col in filtered_df.columns]
     
     if 'question_id' in existing_columns:
