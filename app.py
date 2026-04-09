@@ -54,18 +54,45 @@ try:
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with right_col:
-        st.subheader("🔥 가장 투표를 많이 받은 TOP 5 질문")
-        # 투표수 기준으로 정렬 후 상위 5개 추출
-        top_5_questions = df.nlargest(5, 'vote_count')
+        st.subheader("🔥 가장 투표를 많이 받은 TOP 5")
         
-        # 가로형 막대 차트 생성
-        fig_bar = px.bar(top_5_questions, x='vote_count', y='question_text', orientation='h',
-                         labels={'vote_count':'투표 수', 'question_text':''},
-                         color='vote_count', color_continuous_scale='Blues')
-        # 투표수 많은 게 가장 위로 오도록 정렬 설정
-        fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=0, b=0, l=0, r=0)) 
+        # 1. 투표수 기준으로 상위 5개 추출 후 복사 (경고 방지)
+        top_5_questions = df.nlargest(5, 'vote_count').copy()
+        
+        # 2. 질문 길이가 길면 차트가 찌그러지므로 18자에서 자르기
+        top_5_questions['short_question'] = top_5_questions['question_text'].apply(
+            lambda x: x[:18] + '...' if len(x) > 18 else x
+        )
+        
+        # 3. 차트 생성
+        fig_bar = px.bar(
+            top_5_questions, 
+            x='vote_count', 
+            y='short_question', 
+            orientation='h',
+            text='vote_count', # 바 끝에 투표수 숫자 직접 표시
+            color='vote_count', 
+            color_continuous_scale='Blues',
+            custom_data=['question_text'] # 마우스 오버용으로 전체 질문 데이터 숨겨두기
+        )
+        
+        # 4. 차트 디테일 설정
+        fig_bar.update_traces(
+            # 마우스 올렸을 때 뜨는 툴팁 디자인 설정
+            hovertemplate="<b>%{customdata[0]}</b><br>투표 수: %{x:,.0f}회<extra></extra>",
+            textposition='outside' # 숫자를 바깥쪽에 깔끔하게 배치
+        )
+        
+        fig_bar.update_layout(
+            yaxis={'categoryorder':'total ascending', 'title': ''}, # y축 정렬 및 제목 숨김
+            xaxis={'title': ''}, # x축 제목 숨김 (숫자가 이미 막대에 있으므로)
+            margin=dict(t=10, b=0, l=0, r=40), # 우측 여백을 조금 주어 숫자가 안 잘리게 함
+            height=350, # 차트 높이를 적당히 고정해 촘촘해지는 것 방지
+            coloraxis_showscale=False # 우측 불필요한 컬러바 숨김
+        )
+        
         st.plotly_chart(fig_bar, use_container_width=True)
-
+        
     st.divider()
 
     # 5. 데이터 탐색 (필터링 테이블)
