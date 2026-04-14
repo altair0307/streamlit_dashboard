@@ -15,7 +15,7 @@ st.set_page_config(page_title="통합 분석 대시보드", page_icon="📊", la
 st.sidebar.title("📂 대시보드 메뉴")
 page = st.sidebar.radio(
     "",
-    ("📊 라벨링 분석 (CSV)", "🤖 트렌드 질문 (Live DB)")
+    ("📊 라벨링 분석 (CSV)", "트렌드 질문 (Live DB)")
 )
 
 st.sidebar.divider()
@@ -215,5 +215,5 @@ def show_n8n_dashboard():
 # ==========================================
 if page == "📊 라벨링 분석 (CSV)":
     show_labeling_dashboard()
-elif page == "🤖 N8N 트렌드 봇 (Live DB)":
+elif page == "트렌드 질문 (Live DB)":
     show_n8n_dashboard()
