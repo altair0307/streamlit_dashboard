@@ -99,4 +99,10 @@ try:
     
     # 테이블 출력 (id를 인덱스로 사용)
     st.dataframe(
-        display_df.set_index
+        display_df.set_index('id').sort_index(ascending=False),
+        use_container_width=True
+    )
+
+except Exception as e:
+    st.error("대시보드를 구성하는 중 예상치 못한 오류가 발생했습니다.")
+    st.exception(e)
