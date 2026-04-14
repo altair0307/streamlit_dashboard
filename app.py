@@ -14,12 +14,10 @@ st.set_page_config(page_title="통합 분석 대시보드", page_icon="📊", la
 # ==========================================
 st.sidebar.title("📂 대시보드 메뉴")
 page = st.sidebar.radio(
-    "보고 싶은 화면을 선택하세요:",
     ("📊 라벨링 분석 (CSV)", "🤖 N8N 트렌드 봇 (Live DB)")
 )
 
 st.sidebar.divider()
-st.sidebar.info("💡 2개의 대시보드가 성공적으로 통합되었습니다.")
 
 
 # ==========================================
