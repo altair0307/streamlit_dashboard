@@ -25,7 +25,7 @@ st.sidebar.divider()
 # 📊 [페이지 1] 라벨링 분석 대시보드 (CSV 정적 데이터)
 # ==========================================
 def show_labeling_dashboard():
-    st.title("📊 10대 익명 투표 분석 대시보드")
+    st.title("📊 투표 분석 대시보드")
 
     @st.cache_data
     def load_csv_data():
@@ -116,7 +116,7 @@ def show_labeling_dashboard():
 # 🤖 [페이지 2] N8N 트렌드 봇 대시보드 (Live DB)
 # ==========================================
 def show_n8n_dashboard():
-    st.title("🤖 N8N 실시간 생성 질문 대시보드")
+    st.title("🤖 실시간 생성 질문 대시보드")
 
     # DB 연결 함수
     @st.cache_resource
