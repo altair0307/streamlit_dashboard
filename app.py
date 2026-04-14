@@ -5,119 +5,98 @@ import psycopg2
 import os
 
 # 1. 페이지 설정
-st.set_page_config(page_title="익명 투표 대시보드", page_icon="📊", layout="wide")
-st.title("📊 10대 익명 투표 분석 대시보드 (Live)")
+st.set_page_config(page_title="트렌드 질문 분석 대시보드", page_icon="🤖", layout="wide")
+st.title("📊 AI 생성 트렌드 질문 분석 대시보드")
 
-# 2. DB 연결 함수 (캐싱을 통해 부하 방지)
+# 2. DB 연결 함수
 @st.cache_resource
 def init_connection():
-    # Railway에 설정해둔 DATABASE_URL 환경변수를 불러옵니다.
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
-        st.error("데이터베이스 연결 정보(DATABASE_URL)가 없습니다. Railway 환경 변수를 확인해주세요.")
+        st.error("환경 변수(DATABASE_URL)가 설정되지 않았습니다.")
         st.stop()
     return psycopg2.connect(db_url)
 
 conn = init_connection()
 
-# 3. 데이터 불러오기 (TTL=600: 10분마다 DB를 새로 조회하여 갱신)
-@st.cache_data(ttl=600)
+# 3. 데이터 불러오기 (캐싱 적용)
+@st.cache_data(ttl=300) # 5분마다 갱신
 def load_data():
-    # teen_trend_questions 테이블에서 데이터 가져오기
-    # (실제 테이블에 created_at이나 updated_at 컬럼이 있다면 ORDER BY에 활용하세요)
+    # 요청하신 id, topic, generated_question 컬럼만 호출합니다.
     query = """
         SELECT 
-            topic,
-            generated_guestion
+            id, 
+            topic, 
+            generated_question 
         FROM teen_trend_questions;
     """
-    with conn.cursor() as cur:
-        cur.execute(query)
-        columns = [desc[0] for desc in cur.description]
-        df = pd.DataFrame(cur.fetchall(), columns=columns)
-    
-    # 데이터 전처리: vote_count 숫자 변환
-    df['vote_count'] = pd.to_numeric(df['vote_count'], errors='coerce').fillna(0)
-    return df
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            columns = [desc[0] for desc in cur.description]
+            df = pd.DataFrame(cur.fetchall(), columns=columns)
+        return df
+        
+    except psycopg2.Error as e:
+        st.error("🚨 데이터베이스 조회 중 오류가 발생했습니다.")
+        st.error(f"상세 내용: {e.pgerror}")
+        st.stop()
 
+# 4. 화면 구성
 try:
     df = load_data()
     
-    # --- 상단: 핵심 지표 ---
-    st.subheader("💡 실시간 핵심 요약 지표")
+    # --- 상단: 요약 지표 ---
+    st.subheader("💡 데이터 요약")
     col1, col2, col3 = st.columns(3)
     
-    total_questions = len(df)
-    total_votes = df['vote_count'].sum()
-    top_category = df['main_label'].mode()[0] if not df['main_label'].empty else "데이터 없음"
+    total_q = len(df)
+    unique_topics = df['topic'].nunique()
+    most_common_topic = df['topic'].mode()[0] if not df['topic'].empty else "N/A"
     
-    col1.metric("총 질문 데이터", f"{total_questions:,.0f} 개")
-    col2.metric("총 누적 투표 수", f"{total_votes:,.0f} 회")
-    col3.metric("가장 많은 카테고리", top_category)
+    col1.metric("총 생성 질문 수", f"{total_q:,} 개")
+    col2.metric("활성화된 주제 수", f"{unique_topics} 개")
+    col3.metric("가장 많이 다뤄진 주제", most_common_topic)
     
     st.divider()
 
-    # --- 중단: 차트 영역 ---
+    # --- 중단: 시각화 ---
     left_col, right_col = st.columns(2)
     
     with left_col:
-        st.subheader("🏷️ 카테고리별 질문 분포")
-        category_counts = df['main_label'].value_counts().reset_index()
-        category_counts.columns = ['카테고리', '질문 수']
+        st.subheader("🏷️ 주제(Topic)별 분포")
+        topic_counts = df['topic'].value_counts().reset_index()
+        topic_counts.columns = ['주제', '질문 수']
         
-        fig_pie = px.pie(category_counts, names='카테고리', values='질문 수', hole=0.4, 
-                         color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+        # 주제별 비중을 보여주는 파이 차트
+        fig_pie = px.pie(topic_counts, names='주제', values='질문 수', hole=0.4,
+                         color_discrete_sequence=px.colors.qualitative.Safe)
+        fig_pie.update_layout(margin=dict(t=20, b=0, l=0, r=0))
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with right_col:
-        st.subheader("🔥 실시간 핫플레이스 (투표 TOP 5)")
-        top_5_questions = df.nlargest(5, 'vote_count').copy()
-        
-        # 텍스트 길면 자르기 (18자)
-        top_5_questions['short_question'] = top_5_questions['question_text'].apply(
-            lambda x: x[:18] + '...' if len(x) > 18 else x
-        )
-        
-        fig_bar = px.bar(
-            top_5_questions, 
-            x='vote_count', 
-            y='short_question', 
-            orientation='h',
-            text='vote_count', 
-            color='vote_count', 
-            color_continuous_scale='Blues',
-            custom_data=['question_text']
-        )
-        
-        fig_bar.update_traces(
-            hovertemplate="<b>%{customdata[0]}</b><br>투표 수: %{x:,.0f}회<extra></extra>",
-            textposition='outside'
-        )
-        fig_bar.update_layout(
-            yaxis={'categoryorder':'total ascending', 'title': ''}, 
-            xaxis={'title': ''}, 
-            margin=dict(t=10, b=0, l=0, r=40), 
-            height=350, 
-            coloraxis_showscale=False 
-        )
+        st.subheader("📝 주제별 질문 생성 빈도")
+        # 주제별 빈도를 보여주는 가로 막대 그래프
+        fig_bar = px.bar(topic_counts.head(10), x='질문 수', y='주제', orientation='h',
+                         color='질문 수', color_continuous_scale='Purples')
+        fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=20, b=0, l=0, r=0),
+                              coloraxis_showscale=False)
         st.plotly_chart(fig_bar, use_container_width=True)
 
     st.divider()
 
-    # --- 하단: 최근 갱신된 질문 및 데이터 탐색 ---
-    st.subheader("✨ 최근 갱신된 투표 질문")
+    # --- 하단: 전체 데이터 탐색 ---
+    st.subheader("🔍 전체 질문 데이터 리스트")
     
-    # 최근 갱신된 질문을 보여주기 위해 question_id 기준 내림차순 정렬 (가장 큰 번호가 최신)
-    # 만약 DB에 created_at 같은 날짜 컬럼이 있다면 그것을 기준으로 정렬하면 더 정확합니다.
-    latest_questions = df.sort_values(by='question_id', ascending=False).head(10)
+    # 필터링 옵션
+    topic_list = ["전체"] + list(df['topic'].unique())
+    selected_topic = st.selectbox("특정 주제로 필터링:", topic_list)
     
-    st.markdown("**가장 최근에 추가된 10개의 질문입니다.**")
+    if selected_topic == "전체":
+        display_df = df
+    else:
+        display_df = df[df['topic'] == selected_topic]
+    
+    # 테이블 출력 (id를 인덱스로 사용)
     st.dataframe(
-        latest_questions[['question_id', 'question_text', 'main_label', 'vote_count']].set_index('question_id'), 
-        use_container_width=True
-    )
-
-except Exception as e:
-    st.error("데이터베이스에서 데이터를 불러오는 중 오류가 발생했습니다.")
-    st.exception(e)
+        display_df.set_index
