@@ -9,6 +9,25 @@ import os
 # ==========================================
 st.set_page_config(page_title="통합 분석 대시보드", page_icon="📊", layout="wide")
 
+# 배경색 변경을 위한 커스텀 CSS 주입
+st.markdown(
+    """
+    <style>
+    /* 전체 앱 배경색 변경 */
+    .stApp {
+        background-color: #f6faff;
+    }
+    
+    /* 사이드바 배경색도 맞추고 싶다면 아래 주석을 해제하세요 */
+
+    [data-testid="stSidebar"] {
+        background-color: #f6faff;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # ==========================================
 # 📌 사이드바 메뉴 구성 영역
 # ==========================================
