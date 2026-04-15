@@ -5,31 +5,49 @@ import psycopg2
 import os
 
 # ==========================================
-# 1. 페이지 설정 (앱 전체에 적용되므로 최상단에 선언)
+# 1. 페이지 설정
 # ==========================================
 st.set_page_config(page_title="통합 분석 대시보드", page_icon="📊", layout="wide")
 
-# 배경색 변경을 위한 커스텀 CSS 주입
-st.markdown(
-    """
-    <style>
-    /* 전체 앱 배경색 변경 */
-    .stApp {
-        background-color: #f6faff;
-    }
-    
-    /* 사이드바 배경색도 맞추고 싶다면 아래 주석을 해제하세요 */
-    /*
-    [data-testid="stSidebar"] {
-        background-color: #f6faff;
-    }
-    */
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 # ==========================================
-# 📌 사이드바 메뉴 구성 영역
+# 🎨 2. 하이브리드 테마 감지 (URL 강제 + OS 자동 감지)
+# ==========================================
+# 주소창에서 'theme' 파라미터를 읽어옵니다. (없으면 None)
+theme_param = st.query_params.get("theme", None)
+
+css_code = ""
+
+if theme_param == "dark":
+    # [상황 A] 태블로 다크모드 링크로 접속: 아무것도 안 함 (Streamlit 기본 다크모드 유지)
+    pass
+    
+elif theme_param == "light":
+    # [상황 B] 태블로 라이트모드 링크로 접속: 무조건 지정한 배경색(#f6faff) 강제 적용
+    css_code = """
+    <style>
+    .stApp { background-color: #f6faff !important; }
+    </style>
+    """
+    
+else:
+    # [상황 C] 일반 사이트 주소로 접속 (파라미터 없음): 기기의 다크/라이트 모드를 자동 감지!
+    css_code = """
+    <style>
+    /* 기기가 '라이트모드'일 때만 배경색 적용 */
+    @media (prefers-color-scheme: light) {
+        .stApp { background-color: #f6faff !important; }
+    }
+    /* 기기가 '다크모드'면 위 코드가 무시되고 Streamlit 기본 다크모드가 나옴 */
+    </style>
+    """
+
+# 위 조건에 따라 만들어진 CSS를 화면에 쏴줍니다.
+if css_code:
+    st.markdown(css_code, unsafe_allow_html=True)
+
+
+# ==========================================
+# 📌 3. 사이드바 메뉴 구성 영역
 # ==========================================
 st.sidebar.title("📂 대시보드 메뉴")
 page = st.sidebar.radio(
