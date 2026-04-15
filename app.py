@@ -5,25 +5,22 @@ import psycopg2
 import os
 
 # ==========================================
-# 1. 페이지 기본 설정 (최상단)
+# 1. 페이지 기본 설정
 # ==========================================
-st.set_page_config(page_title="10대 트렌드 통합 대시보드", page_icon="📊", layout="wide")
+st.set_page_config(page_title="10대 트렌드 통합 분석", page_icon="📊", layout="wide")
 
 # ==========================================
-# 🎨 2. 하이브리드 테마(배경색) 자동 감지
+# 🎨 2. 테마 감지 및 배경색 제어 (CSS)
 # ==========================================
-# 태블로에서 넘겨준 주소의 '?theme=' 값을 읽습니다. (기본값 None)
 theme_param = st.query_params.get("theme", None)
 css_code = ""
 
 if theme_param == "dark":
-    # [태블로 다크모드 링크] 아무것도 안 함 -> Streamlit 기본 다크모드 유지
-    pass
+    pass # 기본 다크모드 유지
 elif theme_param == "light":
-    # [태블로 라이트모드 링크] 지정한 배경색(#f6faff) 강제 적용
     css_code = "<style>.stApp { background-color: #f6faff !important; }</style>"
 else:
-    # [일반 웹 접속] 사용자의 기기 설정(라이트/다크)을 자동으로 눈치껏 감지
+    # 일반 접속 시 OS 설정 감지
     css_code = """
     <style>
     @media (prefers-color-scheme: light) {
@@ -37,21 +34,10 @@ if css_code:
 
 
 # ==========================================
-# 🚀 3. URL 링크를 통한 화면 분기 (라우팅)
+# 🚀 3. URL 파라미터를 통한 화면 라우팅
 # ==========================================
-# 주소창에서 '?page=' 값을 읽어옵니다. (값이 없으면 기본 화면으로 'csv' 띄움)
+# 주소창의 ?page= 값을 읽어 화면 결정 (기본값: csv)
 target_page = st.query_params.get("page", "csv")
-
-# 사이드바는 클릭용이 아니라, 현재 화면이 무엇인지 안내하는 상태판으로 사용
-st.sidebar.title("📂 대시보드 상태판")
-if target_page == "csv":
-    st.sidebar.success("현재 **[📊 라벨링 분석 (CSV)]** 화면 렌더링 중")
-elif target_page == "db":
-    st.sidebar.success("현재 **[🤖 N8N 트렌드 봇 (Live)]** 화면 렌더링 중")
-else:
-    st.sidebar.error("알 수 없는 페이지입니다.")
-
-st.sidebar.divider()
 
 
 # ==========================================
@@ -70,7 +56,7 @@ def show_labeling_dashboard():
     try:
         df = load_csv_data()
         
-        # 핵심 지표
+        # 핵심 요약 지표
         st.subheader("💡 핵심 요약 지표")
         col1, col2, col3 = st.columns(3)
         total_questions = len(df)
@@ -83,14 +69,13 @@ def show_labeling_dashboard():
         
         st.divider()
 
-        # 차트 영역
+        # 시각화 영역
         left_col, right_col = st.columns(2)
         
         with left_col:
             st.subheader("🏷️ 카테고리별 질문 분포")
             category_counts = df['main_label'].value_counts().reset_index()
             category_counts.columns = ['카테고리', '질문 수']
-            
             fig_pie = px.pie(category_counts, names='카테고리', values='질문 수', hole=0.4, 
                              color_discrete_sequence=px.colors.qualitative.Pastel)
             fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
@@ -102,7 +87,6 @@ def show_labeling_dashboard():
             top_5_questions['short_question'] = top_5_questions['question_text'].apply(
                 lambda x: x[:18] + '...' if len(x) > 18 else x
             )
-            
             fig_bar = px.bar(
                 top_5_questions, x='vote_count', y='short_question', orientation='h',
                 text='vote_count', color='vote_count', color_continuous_scale='Blues',
@@ -121,7 +105,7 @@ def show_labeling_dashboard():
             
         st.divider()
 
-        # 데이터 탐색 테이블
+        # 상세 데이터 탐색
         st.subheader("🔍 세부 데이터 탐색")
         categories = ["전체 보기"] + list(df['main_label'].dropna().unique())
         selected_category = st.selectbox("카테고리를 선택해서 모아보기:", categories)
@@ -134,13 +118,10 @@ def show_labeling_dashboard():
         display_columns = ['question_id', 'question_text', 'vote_count', 'main_label']
         existing_columns = [col for col in display_columns if col in filtered_df.columns]
         
-        if 'question_id' in existing_columns:
-            st.dataframe(filtered_df[existing_columns].set_index('question_id'), use_container_width=True)
-        else:
-            st.dataframe(filtered_df[existing_columns], use_container_width=True)
+        st.dataframe(filtered_df[existing_columns].set_index('question_id') if 'question_id' in existing_columns else filtered_df[existing_columns], use_container_width=True)
 
     except Exception as e:
-        st.error("데이터를 불러오거나 시각화하는 중 오류가 발생했습니다.")
+        st.error("CSV 데이터를 불러오는 중 오류가 발생했습니다.")
         st.exception(e)
 
 
@@ -149,21 +130,19 @@ def show_labeling_dashboard():
 # ==========================================
 def show_n8n_dashboard():
     st.title("🤖 N8N 실시간 생성 질문 대시보드")
-    st.caption("🔗 Data Source: Railway 내부망 (Private PostgreSQL)")
+    st.caption("🔗 실시간 데이터베이스 연동 모드 (Private Network)")
 
-    # DB 연결 함수
     @st.cache_resource
     def init_connection():
         db_url = os.environ.get("DATABASE_URL")
         if not db_url:
-            st.error("🚨 환경 변수(DATABASE_URL)가 설정되지 않았습니다.")
+            st.error("🚨 DATABASE_URL 환경변수가 없습니다.")
             st.stop()
         return psycopg2.connect(db_url)
 
     try:
         conn = init_connection()
 
-        # 데이터 불러오기 (캐싱 - 5분마다 갱신)
         @st.cache_data(ttl=300)
         def load_db_data():
             query = "SELECT id, topic, generated_question FROM teen_trend_questions;"
@@ -175,70 +154,48 @@ def show_n8n_dashboard():
         db_df = load_db_data()
         
         if db_df.empty:
-            st.warning("⚠️ 현재 데이터베이스에 저장된 질문이 없습니다. n8n 워크플로우를 실행해주세요.")
+            st.warning("⚠️ 저장된 데이터가 없습니다.")
             return
 
-        # 요약 지표
-        st.subheader("💡 실시간 데이터 요약")
+        # 지표 요약
         col1, col2, col3 = st.columns(3)
-        total_q = len(db_df)
-        unique_topics = db_df['topic'].nunique()
-        most_common_topic = db_df['topic'].mode()[0] if not db_df['topic'].empty else "N/A"
-        
-        col1.metric("총 생성 질문 수", f"{total_q:,} 개")
-        col2.metric("활성화된 주제 수", f"{unique_topics} 개")
-        col3.metric("가장 많이 다뤄진 주제", most_common_topic)
+        col1.metric("총 생성 질문", f"{len(db_df):,} 개")
+        col2.metric("활성 주제 수", f"{db_df['topic'].nunique()} 개")
+        col3.metric("최근 업데이트", "실시간 연동")
         
         st.divider()
 
-        # 시각화: 주제별 분포
-        st.subheader("🏷️ 주제(Topic)별 생성 질문 분포")
-        left_col, right_col = st.columns(2)
-        topic_counts = db_df['topic'].value_counts().reset_index()
-        topic_counts.columns = ['주제', '질문 수']
+        # 주제별 시각화
+        st.subheader("🏷️ 주제별 생성 분포")
+        l, r = st.columns(2)
+        counts = db_df['topic'].value_counts().reset_index()
+        counts.columns = ['주제', '질문 수']
         
-        with left_col:
-            fig_pie = px.pie(topic_counts, names='주제', values='질문 수', hole=0.4,
-                             color_discrete_sequence=px.colors.qualitative.Safe)
-            fig_pie.update_layout(margin=dict(t=20, b=0, l=0, r=0))
-            st.plotly_chart(fig_pie, use_container_width=True, theme="streamlit")
-
-        with right_col:
-            fig_bar = px.bar(topic_counts.head(10), x='질문 수', y='주제', orientation='h',
-                             color='질문 수', color_continuous_scale='Purples')
-            fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=20, b=0, l=0, r=0),
-                                  coloraxis_showscale=False)
-            st.plotly_chart(fig_bar, use_container_width=True, theme="streamlit")
+        with l:
+            f1 = px.pie(counts, names='주제', values='질문 수', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+            st.plotly_chart(f1, use_container_width=True, theme="streamlit")
+        with r:
+            f2 = px.bar(counts.head(10), x='질문 수', y='주제', orientation='h', color='질문 수', color_continuous_scale='Purples')
+            f2.update_layout(yaxis={'categoryorder':'total ascending'}, coloraxis_showscale=False)
+            st.plotly_chart(f2, use_container_width=True, theme="streamlit")
 
         st.divider()
 
-        # 전체 데이터 탐색
-        st.subheader("✨ 가장 최근에 생성된 질문 리스트")
-        topic_list = ["전체"] + list(db_df['topic'].unique())
-        selected_topic = st.selectbox("특정 주제로 필터링:", topic_list, key="db_filter")
-        
-        if selected_topic == "전체":
-            display_df = db_df
-        else:
-            display_df = db_df[db_df['topic'] == selected_topic]
-        
-        # id 기준 내림차순 정렬 (최근 데이터가 위로)
-        st.dataframe(
-            display_df.set_index('id').sort_index(ascending=False),
-            use_container_width=True
-        )
+        # 리스트 출력
+        st.subheader("✨ 최근 생성 질문 리스트 (최신순)")
+        st.dataframe(db_df.sort_values('id', ascending=False).set_index('id'), use_container_width=True)
 
     except Exception as e:
-        st.error("내부망 DB 접속 및 조회 중 오류가 발생했습니다. Railway 환경변수(DATABASE_URL)를 확인해 주세요.")
+        st.error("DB 접속 중 오류가 발생했습니다.")
         st.exception(e)
 
 
 # ==========================================
-# 🎯 4. 최종 화면 렌더러
+# 🎯 4. 최종 화면 출력
 # ==========================================
 if target_page == "csv":
     show_labeling_dashboard()
 elif target_page == "db":
     show_n8n_dashboard()
 else:
-    st.error("잘못된 접근입니다. URL의 page 변수를 확인해 주세요.")
+    st.error("잘못된 URL 접근입니다.")
