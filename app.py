@@ -52,7 +52,6 @@ else:
     st.sidebar.error("알 수 없는 페이지입니다.")
 
 st.sidebar.divider()
-st.sidebar.info("💡 태블로(Tableau) 임베딩에 최적화된 URL 분기 모드로 작동 중입니다.")
 
 
 # ==========================================
