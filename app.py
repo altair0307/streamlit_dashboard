@@ -19,11 +19,11 @@ st.markdown(
     }
     
     /* 사이드바 배경색도 맞추고 싶다면 아래 주석을 해제하세요 */
-
+    /*
     [data-testid="stSidebar"] {
         background-color: #f6faff;
     }
-
+    */
     </style>
     """,
     unsafe_allow_html=True
