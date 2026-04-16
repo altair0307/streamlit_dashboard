@@ -15,18 +15,10 @@ CUSTOM_COLORS = [
     "#153780", "#2E44AB", "#4F5AB2", "#7884CD", "#93ACDA"
 ]
 
-# 테마 감지 및 배경색 제어 (CSS)
-theme_param = st.query_params.get("theme", None)
-css_code = ""
-if theme_param == "light":
-    css_code = "<style>.stApp { background-color: #f6faff !important; }</style>"
-elif theme_param != "dark":
-    css_code = "<style>@media (prefers-color-scheme: light) { .stApp { background-color: #f6faff !important; } }</style>"
-
-if css_code:
-    st.markdown(css_code, unsafe_allow_html=True)
-
-# URL 파라미터를 통한 화면 라우팅
+# ==========================================
+# 🚀 2. URL 파라미터를 통한 화면 라우팅
+# ==========================================
+# 주소창의 ?page= 값을 읽어 화면 결정 (기본값: csv)
 target_page = st.query_params.get("page", "csv")
 
 
@@ -65,7 +57,6 @@ def show_labeling_dashboard():
             category_counts = df['main_label'].value_counts().reset_index()
             category_counts.columns = ['카테고리', '질문 수']
             
-            # 파이 차트에 전용 색상 적용
             fig_pie = px.pie(category_counts, names='카테고리', values='질문 수', hole=0.4, 
                              color_discrete_sequence=CUSTOM_COLORS)
             fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
@@ -78,7 +69,6 @@ def show_labeling_dashboard():
                 lambda x: x[:18] + '...' if len(x) > 18 else x
             )
             
-            # 막대 그래프에 전용 색상 스케일 적용
             fig_bar = px.bar(
                 top_5_questions, x='vote_count', y='short_question', orientation='h',
                 text='vote_count', color='vote_count', 
@@ -157,12 +147,10 @@ def show_n8n_dashboard():
         counts.columns = ['주제', '질문 수']
         
         with l:
-            # DB 파이 차트에 전용 색상 적용
             f1 = px.pie(counts, names='주제', values='질문 수', hole=0.4, 
                         color_discrete_sequence=CUSTOM_COLORS)
             st.plotly_chart(f1, use_container_width=True, theme="streamlit")
         with r:
-            # DB 막대 그래프에 전용 색상 스케일 적용
             f2 = px.bar(counts.head(10), x='질문 수', y='주제', orientation='h', 
                         color='질문 수', color_continuous_scale=CUSTOM_COLORS)
             f2.update_layout(yaxis={'categoryorder':'total ascending'}, coloraxis_showscale=False)
@@ -179,7 +167,7 @@ def show_n8n_dashboard():
 
 
 # ==========================================
-# 🎯 4. 최종 화면 출력
+# 🎯 3. 최종 화면 출력
 # ==========================================
 if target_page == "csv":
     show_labeling_dashboard()
