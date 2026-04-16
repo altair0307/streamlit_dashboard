@@ -5,38 +5,28 @@ import psycopg2
 import os
 
 # ==========================================
-# 1. 페이지 기본 설정
+# 1. 페이지 및 전용 색상 설정
 # ==========================================
 st.set_page_config(page_title="10대 트렌드 통합 분석", page_icon="📊", layout="wide")
 
-# ==========================================
-# 🎨 2. 테마 감지 및 배경색 제어 (CSS)
-# ==========================================
+# 요청하신 10가지 전용 색상 팔레트
+CUSTOM_COLORS = [
+    "#150740", "#1c47ab", "#3569c7", "#687de7", "#85acdf", 
+    "#153780", "#2E44AB", "#4F5AB2", "#7884CD", "#93ACDA"
+]
+
+# 테마 감지 및 배경색 제어 (CSS)
 theme_param = st.query_params.get("theme", None)
 css_code = ""
-
-if theme_param == "dark":
-    pass # 기본 다크모드 유지
-elif theme_param == "light":
+if theme_param == "light":
     css_code = "<style>.stApp { background-color: #f6faff !important; }</style>"
-else:
-    # 일반 접속 시 OS 설정 감지
-    css_code = """
-    <style>
-    @media (prefers-color-scheme: light) {
-        .stApp { background-color: #f6faff !important; }
-    }
-    </style>
-    """
+elif theme_param != "dark":
+    css_code = "<style>@media (prefers-color-scheme: light) { .stApp { background-color: #f6faff !important; } }</style>"
 
 if css_code:
     st.markdown(css_code, unsafe_allow_html=True)
 
-
-# ==========================================
-# 🚀 3. URL 파라미터를 통한 화면 라우팅
-# ==========================================
-# 주소창의 ?page= 값을 읽어 화면 결정 (기본값: csv)
+# URL 파라미터를 통한 화면 라우팅
 target_page = st.query_params.get("page", "csv")
 
 
@@ -56,7 +46,6 @@ def show_labeling_dashboard():
     try:
         df = load_csv_data()
         
-        # 핵심 요약 지표
         st.subheader("💡 핵심 요약 지표")
         col1, col2, col3 = st.columns(3)
         total_questions = len(df)
@@ -69,15 +58,16 @@ def show_labeling_dashboard():
         
         st.divider()
 
-        # 시각화 영역
         left_col, right_col = st.columns(2)
         
         with left_col:
             st.subheader("🏷️ 카테고리별 질문 분포")
             category_counts = df['main_label'].value_counts().reset_index()
             category_counts.columns = ['카테고리', '질문 수']
+            
+            # 파이 차트에 전용 색상 적용
             fig_pie = px.pie(category_counts, names='카테고리', values='질문 수', hole=0.4, 
-                             color_discrete_sequence=px.colors.qualitative.Pastel)
+                             color_discrete_sequence=CUSTOM_COLORS)
             fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig_pie, use_container_width=True, theme="streamlit")
 
@@ -87,9 +77,12 @@ def show_labeling_dashboard():
             top_5_questions['short_question'] = top_5_questions['question_text'].apply(
                 lambda x: x[:18] + '...' if len(x) > 18 else x
             )
+            
+            # 막대 그래프에 전용 색상 스케일 적용
             fig_bar = px.bar(
                 top_5_questions, x='vote_count', y='short_question', orientation='h',
-                text='vote_count', color='vote_count', color_continuous_scale='Blues',
+                text='vote_count', color='vote_count', 
+                color_continuous_scale=CUSTOM_COLORS,
                 custom_data=['question_text'] 
             )
             fig_bar.update_traces(
@@ -105,19 +98,13 @@ def show_labeling_dashboard():
             
         st.divider()
 
-        # 상세 데이터 탐색
         st.subheader("🔍 세부 데이터 탐색")
         categories = ["전체 보기"] + list(df['main_label'].dropna().unique())
         selected_category = st.selectbox("카테고리를 선택해서 모아보기:", categories)
         
-        if selected_category == "전체 보기":
-            filtered_df = df
-        else:
-            filtered_df = df[df['main_label'] == selected_category]
-        
+        filtered_df = df if selected_category == "전체 보기" else df[df['main_label'] == selected_category]
         display_columns = ['question_id', 'question_text', 'vote_count', 'main_label']
         existing_columns = [col for col in display_columns if col in filtered_df.columns]
-        
         st.dataframe(filtered_df[existing_columns].set_index('question_id') if 'question_id' in existing_columns else filtered_df[existing_columns], use_container_width=True)
 
     except Exception as e:
@@ -157,7 +144,6 @@ def show_n8n_dashboard():
             st.warning("⚠️ 저장된 데이터가 없습니다.")
             return
 
-        # 지표 요약
         col1, col2, col3 = st.columns(3)
         col1.metric("총 생성 질문", f"{len(db_df):,} 개")
         col2.metric("활성 주제 수", f"{db_df['topic'].nunique()} 개")
@@ -165,23 +151,25 @@ def show_n8n_dashboard():
         
         st.divider()
 
-        # 주제별 시각화
         st.subheader("🏷️ 주제별 생성 분포")
         l, r = st.columns(2)
         counts = db_df['topic'].value_counts().reset_index()
         counts.columns = ['주제', '질문 수']
         
         with l:
-            f1 = px.pie(counts, names='주제', values='질문 수', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+            # DB 파이 차트에 전용 색상 적용
+            f1 = px.pie(counts, names='주제', values='질문 수', hole=0.4, 
+                        color_discrete_sequence=CUSTOM_COLORS)
             st.plotly_chart(f1, use_container_width=True, theme="streamlit")
         with r:
-            f2 = px.bar(counts.head(10), x='질문 수', y='주제', orientation='h', color='질문 수', color_continuous_scale='Purples')
+            # DB 막대 그래프에 전용 색상 스케일 적용
+            f2 = px.bar(counts.head(10), x='질문 수', y='주제', orientation='h', 
+                        color='질문 수', color_continuous_scale=CUSTOM_COLORS)
             f2.update_layout(yaxis={'categoryorder':'total ascending'}, coloraxis_showscale=False)
             st.plotly_chart(f2, use_container_width=True, theme="streamlit")
 
         st.divider()
 
-        # 리스트 출력
         st.subheader("✨ 최근 생성 질문 리스트 (최신순)")
         st.dataframe(db_df.sort_values('id', ascending=False).set_index('id'), use_container_width=True)
 
